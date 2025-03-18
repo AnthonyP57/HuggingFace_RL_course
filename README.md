@@ -20,7 +20,7 @@ Action space is the set of all possible actions in an environment (discrete spac
 Reward is the only feedback for the agent, cumulative reward can be written as: R(T) = r<sub>t+1</sub> + r<sub>t+2</sub> + ...</br>
 However in reality we cannot add the rewards like that, because some rewards may be more obvious e.g. right in front of us and some may be less obvious (discounted rewards) e.g. we need to jump over a fence first to get 3x</br>
 To discount the rewards we proceed like:</br>
-1. we define a discount rate called gamme ∈ [0,1], mostly ~0.95. The larget the gamma the more our agent cares for long term rewards.</br>
+1. we define a discount rate called gamma ∈ [0,1], mostly ~0.95. The larget the gamma the more our agent cares for long term rewards.</br>
 2. Each reward will be discounted by gamma<sup>time step</sup>. As the time step increases it is less likely to get the long-term reward.</br>
 
 R(T) = r<sub>t+1</sub> + γr<sub>t+2</sub> + γ<sup>2</sup>r<sub>t+3</sub> + ...</br>
@@ -37,7 +37,7 @@ Episodic | Continuing
 We have a starting point and an ending point (terminal space). This creates an episode: a list of states, actions, rewards and sew states e.g. you start somewhere and end when you are killed or reach the end.
 
 ### Continuing
-There is no terminal space. We must learn how to choose the best actions and simultaneously interaact with the environment.
+There is no terminal space. We must learn how to choose the best actions and simultaneously interact with the environment.
 
 ## Exploration/Exploitation trade-off
 - exploration - we do random actions to find more info about the environment
@@ -86,7 +86,7 @@ At each step our policy will select the state with the highest value.
 
 ## 'Deep' in RL
 Deep RL - deep NNs to solve RL problems.
-There are value-based such as: Q-learning and deep Q-learning
+They are value-based such as: Q-learning and deep Q-learning
 
 The difference being that in the former we use a Q table that helps us to find what action to take, and in the latter we approximate the Q value with a NN.
 
@@ -121,7 +121,7 @@ For each state the state-value function outputs the expected return if the agent
 <p align="center">
   <img src="./img/action-state-value-function-2.jpg" alt="action-value-func", width="600"/>
 </p>
-For each state and action pair te sction-value function outputs the expected return of the agent starts in that state, takes that sction and then follows the policy.
+For each state and action pair te state-value function outputs the expected return of the agent starts in that state, takes that action and then follows the policy.
 
 The difference between the 2 being:
 - for state-value for each state we calculate the value of the state S<sub>t</sub>
@@ -142,6 +142,44 @@ We do this:
 </p>
 
 ##### Epsilon-Greedy Policy
+--TO BE FINSHED--
+
+### Monte Carlo vs Temporal Difference Learning
+MC and Temporal Difference Learning are two different strategies on how to train our value function. Both of them use experience to solve the RL problem.
+
+#### Monte Carlo
+Uses the entire episode of experience for learning. At the end of the episode it calculate G<sub>t</sub> (return) and uses to as a target to update V(S<sub>t</sub>).
+E.g. :
+- we always start at the same point
+- the agent takes actions using a policy e.g. Greedy
+- we get the reward and the next state
+- we terminate the game at some timestep
+- at the end we will have a list of S,A,R and the next state
+- the agent will sum the rewards G
+- and then update V based on the formula
+
+<p align="center">
+  <img src="./img/V_calc.jpg" alt="v-calc", width="600"/>
+</p>
+
+- we start a new game
+
+If we train a state-value function using MC:
+
+- we initialize a function so that it returns 0 for each state
+- we set the _lr_ to be e.g. 0.1 and the _discount rate_ to be e.g. 1
+- our agent explores the environment and takes actions
+- we end the game at some point
+- we calculate the return G
+- we compute the new V
+
+<p align="center">
+  <img src="./img/MC_simulation.jpg" alt="mc-sim", width="600"/>
+</p>
+
+#### Temporal Difference Learning (TD)
+Uses only a step (S<sub>t</sub>,A<sub>t</sub>,R<sub>t+1</sub>,S<sub>t+1</sub>) to learn. Consequently we learn at each step. 
+
 
 
 ## Code Overview
