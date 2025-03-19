@@ -20,7 +20,7 @@ Action space is the set of all possible actions in an environment (discrete spac
 Reward is the only feedback for the agent, cumulative reward can be written as: R(T) = r<sub>t+1</sub> + r<sub>t+2</sub> + ...</br>
 However in reality we cannot add the rewards like that, because some rewards may be more obvious e.g. right in front of us and some may be less obvious (discounted rewards) e.g. we need to jump over a fence first to get 3x</br>
 To discount the rewards we proceed like:</br>
-1. we define a discount rate called gamma ∈ [0,1], mostly ~0.95. The larget the gamma the more our agent cares for long term rewards.</br>
+1. we define a discount rate called gamma ∈ [0,1], mostly ~0.95. The larger the gamma the more our agent cares for long term rewards.</br>
 2. Each reward will be discounted by gamma<sup>time step</sup>. As the time step increases it is less likely to get the long-term reward.</br>
 
 R(T) = r<sub>t+1</sub> + γr<sub>t+2</sub> + γ<sup>2</sup>r<sub>t+3</sub> + ...</br>
@@ -95,6 +95,107 @@ The difference being that in the former we use a Q table that helps us to find w
 </p>
 
 ## Q-learning
+Q-learning is a off-policy based method that uses a TD approach to trian its action-value function:
+- off-policy -
+- value-based method - finds the optimal policy indirectly by training a value or action-value
+- TD - updates its action-value function at each step
+
+The "Q" comes from "Quality" (value) of the action at that state.
+
+Value vs reward:
+- value of a state or state-action pair is the expected cumulative reward our agent gets if it starts at this state and contiues according to its policy
+- reward is the feedback the agent gets from the environment after performing an action
+
+Q-learning is the RL algorithm that trains a Q-function that internally is a Q-table, meaning for all state-action pairs it has a value. After training we have an optimal Q-function -> (optimal Q-table and optimal policy).
+In the beginning the Q-table is useless as it given arbitrary values for each state-action pair (mostly we initialize the Q-table as zeros). As the agent explores the environment we update the Q-table which gives a better approximation of the optimal policy.
+
+<p align="center">
+  <img src="./img/q-table.jpg" alt="Q-table", width="600"/>
+</p>
+
+### Q-learning algorithm
+
+<p align="center">
+  <img src="./img/q-algo.jpg" alt="Q-algo", width="600"/>
+</p>
+
+- Step 1: initialize Q-table
+- Step 2: choose an action using th epsilon-greedy strategy
+- Step 3: perform an action, get the reward and the next step
+- Step 4: update Q(S<sub>t</sub>, A<sub>t</sub>), for action-state pair the equation turns out to be:
+
+<p align="center">
+  <img src="./img/state-action-equation.jpg" alt="Q-algo", width="600"/>
+</p>
+
+We say that Q-learning is an off-policy algorithm because we only greedy-search to get the highest value of the best action of the next state.
+
+#### Off-policy vs On-policy
+- Off-policy - different action for acting (inference) and updating (training)
+- On-policy - the same policy for acting and updating. For instance "Sarsa" (value-based algorithm) uses the epsilon-greedy policy to get the value of the next step
+
+<p align="center">
+  <img src="./img/off-on-policy.jpg" alt="off-on", width="600"/>
+</p>
+
+### Q-learning example
+#### Game rules
+
+<p align="center">
+  <img src="./img/q-example.jpg" alt="q-example", width="600"/>
+</p>
+If we take >5 steps or eat the big pile of cheese we end the game.
+
+#### Step 1
+Initialize Q-table
+
+<p align="center">
+  <img src="./img/q-learn-step1.jpg" alt="q-step1", width="600"/>
+</p>
+
+#### Step 2
+As we don't have any info abour the environment the the epsilon at the beginning is high we explore (select a random function)
+
+<p align="center">
+  <img src="./img/q-learn-step2.jpg" alt="q-step2", width="600"/>
+</p>
+
+#### Step 3
+We ate the small cheese and get the reward R<sub>t+1</sub> and procede to the new state
+
+<p align="center">
+  <img src="./img/q-learn-step3.jpg" alt="q-step3", width="600"/>
+</p>
+
+#### Step 4
+We update the Q(S<sub>t</sub>, A<sub>t</sub>) using the formula
+
+<p align="center">
+  <img src="./img/q-learn-step4.jpg" alt="q-step4", width="600"/>
+</p>
+
+#### Step 5
+Choose another action (we also decay the epsilon)
+
+<p align="center">
+  <img src="./img/q-learn-step5.jpg" alt="q-step5", width="600"/>
+</p>
+
+Our reward is very negative as we ate poison and died R<sub>t+1<sub> = -10
+
+#### Step 6
+We update the Q(S<sub>t</sub>, A<sub>t</sub>)
+
+<p align="center">
+  <img src="./img/q-learn-step6.jpg" alt="q-step6", width="600"/>
+</p>
+
+Because we died we start a new episode, but our agent has become smarter.
+
+### Summary
+- policy-based methods - the policy is trained with a NN to select what action to take given a state. In this case it is the NN that tells the agent what to do, depending on past experience
+- value-based methods - the value function is traine to output the value of a state or a state-action pair that will represent our policy. However this value doesn't define what action the agent should take, instead we need to specify the agent's behaviour based on the values, for instance greedy
+
 ### Recap
 #### Policy-based methods
 Directly train the policy to select what action to take given a state (we don't have a value function) - we don't define by hand the behaviour of our policy, the training will define it.
@@ -142,10 +243,20 @@ We do this:
 </p>
 
 ##### Epsilon-Greedy Policy
---TO BE FINSHED--
+
+<p align="center">
+  <img src="./img/epsi-greedy.jpg" alt="epsi-greedy", width="600"/>
+</p>
+
+With ϵ = 1 meaning that the probability of exploration is maximum. At the beginning the probability of exploration will be the highest, but as the Q-table gets better we will reduce the ϵ since we don't need to explore as much.
+
+<p align="center">
+  <img src="./img/epsi-schedule.jpg" alt="epsi-schedule", width="600"/>
+</p>
+
 
 ### Monte Carlo vs Temporal Difference Learning
-MC and Temporal Difference Learning are two different strategies on how to train our value function. Both of them use experience to solve the RL problem.
+MC and Temporal Difference Learning are two different strategies on how to train our value or policy function. Both of them use experience to solve the RL problem.
 
 #### Monte Carlo
 Uses the entire episode of experience for learning. At the end of the episode it calculate G<sub>t</sub> (return) and uses to as a target to update V(S<sub>t</sub>).
@@ -177,9 +288,38 @@ If we train a state-value function using MC:
   <img src="./img/MC_simulation.jpg" alt="mc-sim", width="600"/>
 </p>
 
-#### Temporal Difference Learning (TD)
-Uses only a step (S<sub>t</sub>,A<sub>t</sub>,R<sub>t+1</sub>,S<sub>t+1</sub>) to learn. Consequently we learn at each step. 
+<p align="center">
+  <img src="./img/MC.jpg" alt="mc", width="600"/>
+</p>
 
+#### Temporal Difference Learning (TD)
+Uses only a step (S<sub>t</sub>,A<sub>t</sub>,R<sub>t+1</sub>,S<sub>t+1</sub>) to learn. Consequently we learn at each step by forming a TD target from S(<sub>t+1</sub>)
+
+We update V(S<sub>t</sub>) at each step. But because we didn't experience the entire episode we don't have G<sub>t</sub>, we estimate it by adding R<sub>t+1</sub>and the discounted value of the next state.
+This is called bootstrapping because TD bases its update on the existing estimate V(<sub>t+1</sub>) and not a complete sample G.
+
+E.g.
+- we initialize our function to return 0 at each state
+- Our lr is e.g. 0.1 and our discount rate is 1
+- the agent explores the environment by goint left
+- it gets a reward R<sub>t+1</sub>
+- we now update V(S<sub>0</sub>) as:
+  - V(S<sub>0</sub>) = V(S<sub>0</sub>) + lr*[R<sub>1</sub> + У*V(S<sub>1</sub>) - V(S<sub>0</sub>)]
+  - V(S<sub>0</sub>) = 0 + 0.1*[1+1*0-0]
+  - V(S<sub>0</sub>) = 0.1
+- and we continue to interact with the environment
+
+<p align="center">
+  <img src="./img/TD.jpg" alt="td", width="600"/>
+</p>
+
+#### Summary
+- MC updates the value function after a complete episode and we use the actual accurate discounted return of the episode.
+- TD updates the value function at each step, we replace G - which we don't know - with an extimated return called the TD target.
+- there are two types of value-based functions:
+  - state-value function - outputs the expected return if the agent starts at a given state and acts according to the policy forever after
+  - action-value function - outputs the expected return if the agent starts in a given state, takes a given action at that state and then acts accordingly to the policy forever
+- in value-based methods rather than learning the policy we define it by hand and learn a value function.
 
 
 ## Code Overview
@@ -333,4 +473,43 @@ model = PPO.load(checkpoint, custom_objects=custom_objects, print_system_info=Tr
 eval_env = Monitor(gym.make("LunarLander-v2"))
 mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=10, deterministic=True)
 print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
+```
+
+### Frozen lake / An autonomous taxi - Q-learning
+#### Environments
+
+<p align="center">
+  <img src="./img/envs.gif" alt="envs", width="600"/>
+</p>
+
+#### Code
+##### Trick to use virtual screen in google colab
+```
+import os
+
+os.kill(os.getpid(), 9)
+```
+```
+from pyvirtualdisplay import Display
+
+virtual_display = Display(visible=0, size=(1400, 900))
+virtual_display.start()
+```
+##### Frozen lake
+```
+import numpy as np
+import gymnasium as gym
+import random
+import imageio
+import os
+import tqdm
+
+import pickle5 as pickle
+from tqdm.notebook import tqdm
+```
+```
+# map_name = "4x4" | "8x8"
+# is_slippery = define is we want the lake to be slipprey (agent to have momentum)
+
+env = gym.make("FrozenLake-v1", map_name="4x4", is_slippery=False, render_mode="rgb_array")
 ```
