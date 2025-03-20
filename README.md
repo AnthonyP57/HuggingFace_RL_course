@@ -513,3 +513,95 @@ from tqdm.notebook import tqdm
 
 env = gym.make("FrozenLake-v1", map_name="4x4", is_slippery=False, render_mode="rgb_array")
 ```
+Creating a custom grid
+```
+desc=["SFFF", "FHFH", "FFFH", "HFFG"]
+gym.make('FrozenLake-v1', desc=desc, is_slippery=True)
+```
+Observation space
+```
+print("_____OBSERVATION SPACE_____ \n")
+print("Observation Space", env.observation_space)
+print("Sample observation", env.observation_space.sample())  # Get a random observation
+
+# the observation space is discreete(16), the observation is an integer representing the agent's current position as cur_row*n_col+corrent_col (col and row start at 0)
+```
+
+<p align="left">
+  <img src="./img/goal_pos.png" alt="goal-pos", width="300"/>
+</p>
+E.g. the goal position is 3*4+3=15 (cur_row_index + n_cols + cur_col_index)
+
+Action space
+```
+print("\n _____ACTION SPACE_____ \n")
+print("Action Space Shape", env.action_space.n)
+print("Action Space Sample", env.action_space.sample())  # Take a random action
+
+# 0 : left
+# 1 : down
+# 2 : right
+# 3 : up
+```
+###### Step 1
+Initialize Q-table
+```
+state_space = env.observation_space.n
+print("There are ", state_space, " possible states")
+
+action_space = env.action_space.n
+print("There are ", action_space, " possible actions")
+
+def initialize_q_table(state_size, action_size):
+  qtab = np.zeros((state_size, action_size))
+  return qtab
+
+qtab_frozen_lake = initialize_q_table(state_space, action_space)
+```
+Define (off-policy policy)
+```
+def greedy(qtab, state):
+  action = np.argmax(qtab[state])
+  return action
+```
+Define policy
+```
+def epsilon_policy(qtab, state, epsi):
+
+  rand_num = np.random.uniform(0,1)
+  if random > epsi:
+    action = greedy(qtab)
+  else:
+    action = env.action.space.sample()
+
+  return action
+```
+Define hyperparams
+```
+n_epochs = 1e5
+lr = 0.5
+
+n_eval = 100
+
+env_id = 'FrozenLake-v1'
+max_steps = 99
+gamma = 0.95 # discount
+
+max_epsilon = 1.0
+min_epsilon = 0.05
+epsi_decay = 5e-4
+```
+Training loop - pseudocode
+```
+For epoch in total n epochs:
+
+  reduce epsi
+  reset env
+
+  for step in max steps:
+    choose action according to epsilon policy
+    take action (a) and abserve state and reward (s', r)
+    update Q-value using Bellman equation: Q(s,a) + lr [R(s,a) + gamma * max Q(s', ') - Q(s,a)]
+    if done finish epoch
+    next state = new state
+```
