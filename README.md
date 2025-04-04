@@ -96,7 +96,7 @@ The difference being that in the former we use a Q table that helps us to find w
 
 ## Q-learning
 Q-learning is a off-policy based method that uses a TD approach to trian its action-value function:
-- off-policy -
+- off-policy - we only set the values, the policy is e.g. greedy
 - value-based method - finds the optimal policy indirectly by training a value or action-value
 - TD - updates its action-value function at each step
 
@@ -181,7 +181,7 @@ Choose another action (we also decay the epsilon)
   <img src="./img/q-learn-step5.jpg" alt="q-step5", width="600"/>
 </p>
 
-Our reward is very negative as we ate poison and died R<sub>t+1<sub> = -10
+Our reward is very negative as we ate poison and died R<sub>t+1</sub> = -10
 
 #### Step 6
 We update the Q(S<sub>t</sub>, A<sub>t</sub>)
@@ -194,7 +194,7 @@ Because we died we start a new episode, but our agent has become smarter.
 
 ### Summary
 - policy-based methods - the policy is trained with a NN to select what action to take given a state. In this case it is the NN that tells the agent what to do, depending on past experience
-- value-based methods - the value function is traine to output the value of a state or a state-action pair that will represent our policy. However this value doesn't define what action the agent should take, instead we need to specify the agent's behaviour based on the values, for instance greedy
+- value-based methods - the value function is trained to output the value of a state or a state-action pair that will represent our policy. However this value doesn't define what action the agent should take, instead we need to specify the agent's behaviour based on the values, for instance greedy
 
 ### Recap
 #### Policy-based methods
@@ -222,7 +222,7 @@ For each state the state-value function outputs the expected return if the agent
 <p align="center">
   <img src="./img/action-state-value-function-2.jpg" alt="action-value-func", width="600"/>
 </p>
-For each state and action pair te state-value function outputs the expected return of the agent starts in that state, takes that action and then follows the policy.
+For each state and action pair the state-value function outputs the expected return of the agent starts in that state, takes that action and then follows the policy.
 
 The difference between the 2 being:
 - for state-value for each state we calculate the value of the state S<sub>t</sub>
@@ -301,7 +301,7 @@ This is called bootstrapping because TD bases its update on the existing estimat
 E.g.
 - we initialize our function to return 0 at each state
 - Our lr is e.g. 0.1 and our discount rate is 1
-- the agent explores the environment by goint left
+- the agent explores the environment by going left
 - it gets a reward R<sub>t+1</sub>
 - we now update V(S<sub>0</sub>) as:
   - V(S<sub>0</sub>) = V(S<sub>0</sub>) + lr*[R<sub>1</sub> + У*V(S<sub>1</sub>) - V(S<sub>0</sub>)]
@@ -604,4 +604,342 @@ For epoch in total n epochs:
     update Q-value using Bellman equation: Q(s,a) + lr [R(s,a) + gamma * max Q(s', ') - Q(s,a)]
     if done finish epoch
     next state = new state
+```
+Train function
+```
+def train(n_epoch, min_epsi, max_epsi, decay_rate, env, max_steps, qtable):
+  for episode in tqdm(range(n_epoch)):
+    epsi = min_epsi + (max_epsi - min_epsi)*np.exp(-decay_rate*episode)
+    
+    state, info = env.reset()
+    step=0
+    terminated = False
+    truncated = False
+
+    for step in range(max_steps):
+      action = epsilon_policy(qtable, state, epsi)
+
+      new_state, reward, terminated, truncated, info = env.step(action)
+
+      qtable[state][action] = qtable[state][action] + lr*(reward + gamma * np.max(qtable[new_state]) - qtable[state][action])
+
+      if terminated or truncated:
+        break
+
+      state = new_state
+  
+  return qtable
+```
+```
+qtab_frozen_lake = train(n_epochs, min_epsilon, max_epsilon, epsi_decay, env, max_steps, qtab_frozen_lake)
+```
+Evaluate agent
+```
+def eval(env, max_steps, n_eval_epochs, q, seed):
+  episode_rewards=[]
+  for episode in tqdm(range(n_eval_epochs)):
+    if seed:
+      state, info = env.reset(seed=seed[episode])
+    else:
+      state, info = env.reset()
+
+    step=0
+    truncated=False
+    terminated=False
+    total_rewards_ep=0
+
+    for step in range(max_steps):
+      action = greedy_policy(q, state)
+      new_state , reward, terminated, truncated, info = env.step(action)
+      total_rewards_ep += reward
+
+      if terminated or truncated:
+        break
+
+      state = new_state
+
+    episode_rewards.append(total_rewards_ep)
+
+  mean_reward = np.mean(episode_rewards)
+  std_reward = np.std(episode_rewards)
+
+  return mean_reward, std_reward
+```
+```
+mean_reward, std_reward = evaluate_agent(env, max_steps, n_eval_epochs, qtab_frozen_lake, eval_seed)
+print(f"Mean_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+```
+Push model to HF hub
+```
+from huggingface_hub import HfApi, snapshot_download
+from huggingface_hub.repocard import metadata_eval_result, metadata_save
+
+from pathlib import Path
+import datetime
+import json
+
+def record_video(env, Qtable, out_directory, fps=1):
+    """
+    Generate a replay video of the agent
+    :param env
+    :param Qtable: Qtable of our agent
+    :param out_directory
+    :param fps: how many frame per seconds (with taxi-v3 and frozenlake-v1 we use 1)
+    """
+    images = []
+    terminated = False
+    truncated = False
+    state, info = env.reset(seed=random.randint(0, 500))
+    img = env.render()
+    images.append(img)
+    while not terminated or truncated:
+        # Take the action (index) that have the maximum expected future reward given that state
+        action = np.argmax(Qtable[state][:])
+        state, reward, terminated, truncated, info = env.step(
+            action
+        )  # We directly put next_state = state for recording logic
+        img = env.render()
+        images.append(img)
+    imageio.mimsave(out_directory, [np.array(img) for i, img in enumerate(images)], fps=fps)
+
+def push_to_hub(repo_id, model, env, video_fps=1, local_repo_path="hub"):
+    """
+    Evaluate, Generate a video and Upload a model to Hugging Face Hub.
+    This method does the complete pipeline:
+    - It evaluates the model
+    - It generates the model card
+    - It generates a replay video of the agent
+    - It pushes everything to the Hub
+
+    :param repo_id: repo_id: id of the model repository from the Hugging Face Hub
+    :param env
+    :param video_fps: how many frame per seconds to record our video replay
+    (with taxi-v3 and frozenlake-v1 we use 1)
+    :param local_repo_path: where the local repository is
+    """
+    _, repo_name = repo_id.split("/")
+
+    eval_env = env
+    api = HfApi()
+
+    # Step 1: Create the repo
+    repo_url = api.create_repo(
+        repo_id=repo_id,
+        exist_ok=True,
+    )
+
+    # Step 2: Download files
+    repo_local_path = Path(snapshot_download(repo_id=repo_id))
+
+    # Step 3: Save the model
+    if env.spec.kwargs.get("map_name"):
+        model["map_name"] = env.spec.kwargs.get("map_name")
+        if env.spec.kwargs.get("is_slippery", "") == False:
+            model["slippery"] = False
+
+    # Pickle the model
+    with open((repo_local_path) / "q-learning.pkl", "wb") as f:
+        pickle.dump(model, f)
+
+    # Step 4: Evaluate the model and build JSON with evaluation metrics
+    mean_reward, std_reward = evaluate_agent(
+        eval_env, model["max_steps"], model["n_eval_episodes"], model["qtable"], model["eval_seed"]
+    )
+
+    evaluate_data = {
+        "env_id": model["env_id"],
+        "mean_reward": mean_reward,
+        "n_eval_episodes": model["n_eval_episodes"],
+        "eval_datetime": datetime.datetime.now().isoformat(),
+    }
+
+    # Write a JSON file called "results.json" that will contain the
+    # evaluation results
+    with open(repo_local_path / "results.json", "w") as outfile:
+        json.dump(evaluate_data, outfile)
+
+    # Step 5: Create the model card
+    env_name = model["env_id"]
+    if env.spec.kwargs.get("map_name"):
+        env_name += "-" + env.spec.kwargs.get("map_name")
+
+    if env.spec.kwargs.get("is_slippery", "") == False:
+        env_name += "-" + "no_slippery"
+
+    metadata = {}
+    metadata["tags"] = [env_name, "q-learning", "reinforcement-learning", "custom-implementation"]
+
+    # Add metrics
+    eval = metadata_eval_result(
+        model_pretty_name=repo_name,
+        task_pretty_name="reinforcement-learning",
+        task_id="reinforcement-learning",
+        metrics_pretty_name="mean_reward",
+        metrics_id="mean_reward",
+        metrics_value=f"{mean_reward:.2f} +/- {std_reward:.2f}",
+        dataset_pretty_name=env_name,
+        dataset_id=env_name,
+    )
+
+    # Merges both dictionaries
+    metadata = {**metadata, **eval}
+
+    model_card = f"""
+  # **Q-Learning** Agent playing1 **{env_id}**
+  This is a trained model of a **Q-Learning** agent playing **{env_id}** .
+
+  ## Usage
+
+  model = load_from_hub(repo_id="{repo_id}", filename="q-learning.pkl")
+
+  # Don't forget to check if you need to add additional attributes (is_slippery=False etc)
+  env = gym.make(model["env_id"])
+  """
+
+    evaluate_agent(env, model["max_steps"], model["n_eval_episodes"], model["qtable"], model["eval_seed"])
+
+    readme_path = repo_local_path / "README.md"
+    readme = ""
+    print(readme_path.exists())
+    if readme_path.exists():
+        with readme_path.open("r", encoding="utf8") as f:
+            readme = f.read()
+    else:
+        readme = model_card
+
+    with readme_path.open("w", encoding="utf-8") as f:
+        f.write(readme)
+
+    # Save our metrics to Readme metadata
+    metadata_save(readme_path, metadata)
+
+    # Step 6: Record a video
+    video_path = repo_local_path / "replay.mp4"
+    record_video(env, model["qtable"], video_path, video_fps)
+
+    # Step 7. Push everything to the Hub
+    api.upload_folder(
+        repo_id=repo_id,
+        folder_path=repo_local_path,
+        path_in_repo=".",
+    )
+
+    print("Your model is pushed to the Hub. You can view your model here: ", repo_url)
+```
+```
+model = {
+    "env_id": env_id,
+    "max_steps": max_steps,
+    "n_training_episodes": n_training_episodes,
+    "n_eval_episodes": n_eval_episodes,
+    "eval_seed": eval_seed,
+    "learning_rate": learning_rate,
+    "gamma": gamma,
+    "max_epsilon": max_epsilon,
+    "min_epsilon": min_epsilon,
+    "decay_rate": decay_rate,
+    "qtable": Qtable_frozenlake,
+}
+```
+```
+username = #USER_123
+repo_name = #frozenlake_best_model
+push_to_hub(repo_id=f"{username}/{repo_name}", model=model, env=env)
+```
+
+##### Taxi-v3
+Initialize Q-table
+```
+Qtable_taxi = initialize_q_table(state_space, action_space)
+print(Qtable_taxi)
+print("Q-table shape: ", Qtable_taxi.shape)
+```
+Define hyperparameters
+```
+n_training_episodes = 25000
+learning_rate = 0.7
+
+n_eval_episodes = 100
+
+eval_seed = [
+    16,
+    54,
+    165,
+    177,
+    ...
+    11,
+    28,
+    148,
+]
+
+env_id = "Taxi-v3"
+max_steps = 99
+gamma = 0.95
+
+max_epsilon = 1.0
+min_epsilon = 0.05
+decay_rate = 0.005
+```
+Train
+```
+Qtable_taxi = train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, Qtable_taxi)
+```
+Push to HF hub
+```
+model = {
+    "env_id": env_id,
+    "max_steps": max_steps,
+    "n_training_episodes": n_training_episodes,
+    "n_eval_episodes": n_eval_episodes,
+    "eval_seed": eval_seed,
+    "learning_rate": learning_rate,
+    "gamma": gamma,
+    "max_epsilon": max_epsilon,
+    "min_epsilon": min_epsilon,
+    "decay_rate": decay_rate,
+    "qtable": Qtable_taxi,
+}
+```
+```
+username = #USER_123
+repo_name = #frozenlake_best_model
+push_to_hub(repo_id=f"{username}/{repo_name}", model=model, env=env)
+```
+Load from HF hub
+```
+from urllib.error import HTTPError
+
+from huggingface_hub import hf_hub_download
+
+
+def load_from_hub(repo_id: str, filename: str) -> str:
+    """
+    Download a model from Hugging Face Hub.
+    :param repo_id: id of the model repository from the Hugging Face Hub
+    :param filename: name of the model zip file from the repository
+    """
+    # Get the model from the Hub, download and cache the model on your local disk
+    pickle_model = hf_hub_download(repo_id=repo_id, filename=filename)
+
+    with open(pickle_model, "rb") as f:
+        downloaded_model_file = pickle.load(f)
+
+    return downloaded_model_file
+```
+```
+model = load_from_hub(repo_id="ThomasSimonini/q-Taxi-v3", filename="q-learning.pkl")  # Try to use another model
+
+print(model)
+env = gym.make(model["env_id"])
+
+evaluate_agent(env, model["max_steps"], model["n_eval_episodes"], model["qtable"], model["eval_seed"])
+```
+```
+model = load_from_hub(
+    repo_id="ThomasSimonini/q-FrozenLake-v1-no-slippery", filename="q-learning.pkl"
+)  # Try to use another model
+
+env = gym.make(model["env_id"], is_slippery=False)
+
+evaluate_agent(env, model["max_steps"], model["n_eval_episodes"], model["qtable"], model["eval_seed"])
 ```
