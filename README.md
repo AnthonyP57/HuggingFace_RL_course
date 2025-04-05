@@ -321,6 +321,94 @@ E.g.
   - action-value function - outputs the expected return if the agent starts in a given state, takes a given action at that state and then acts accordingly to the policy forever
 - in value-based methods rather than learning the policy we define it by hand and learn a value function.
 
+## Deep Q-learning
+Deep Q-learning is about approximating Q-values instead of "training" a Q-table. The Q-table is the memory or cheat sheet of our Q-function - it is a tabular method, which is not suitable for big arrays and tables (it is not scalable), it works good for small environments but not amazing if we have thousands of possibilities.
+
+Therefore we approximate the Q-values with a parametrized Q-function $Q_{\theta}(s,a)$ (a NN).
+
+<p align="center">
+  <img src="./img/deep_q.jpg" alt="td", width="600"/>
+</p>
+
+<p align="center">
+  <img src="./img/deep_q_cnn.jpg" alt="td", width="600"/>
+</p>
+
+Here as the input we take a stack of 4 frames, get Q-values for each action and use our policy e.g. epsilon-greedy to select which action to take.
+
+But first we need to preprocess the input in order to reduce the state's complexity and improve computation time, we can e.g. grayscale the frames, squeeze the frame and crop some part of the frame.
+
+<p align="center">
+  <img src="./img/deep_q_preprocess.jpg" alt="td", width="600"/>
+</p>
+
+We use multiple frames to handle temporal limitations, like lack of movement for a single frame.
+
+### Q-value
+In deep Q-learning we create a loss function that compares our Q-value prediction and the Q-value target
+
+<p align="center">
+  <img src="./img/deep_q_loss.jpg" alt="td", width="600"/>
+</p>
+
+Deep Q-learning has two phases:
+- Sampling - we perform actions and store the observed experience tuples in replay memory
+- Training - select a small batch of tuples randomly and learn from this batch using a gradient descent update step
+
+<p align="center">
+  <img src="./img/deep_q_sampling.jpg" alt="td", width="600"/>
+</p>
+
+Training may be unstable because we approximate the target return instead of calculating it (bootstrapping). To help stabilize the training we can:
+
+1. Experience Replay to make more efficient use of experiences
+2. Fix Q-target to stabilize the training
+3. Use double Deep Q-learning to handle the problem of the overestimation of Q-values
+
+#### Experience replay
+
+<p align="center">
+  <img src="./img/deep_q_replay.jpg" alt="td", width="600"/>
+</p>
+
+We create the replay memory to:
+
+1. Make more efficient use of the experiences during the training - usually in online RL, the agent interacts with the environment, gets experiences (state, action, reward, next state), learns from them and discards them. This is not efficient, instead we can save the experience and resue them during training.
+2. Avoid forgetting pervious experiences (aka catastrophic interference or forgetting) and reduce the correlation between experiences. The solution is to create a replay buffer that stores experience tuples while interacting with the environment and then sample a small batch of tuples - this prevents the network from only learning about what it has done immidiately before. By randomly sampling the experiences we can remove correlation in the observation sequences and avoid action values from oscillating or diverging catastrophically
+
+#### Fixed Q-Target
+When we calculate the TD error (loss) we calcualte the difference between the TD target (Q-target) and the current Q-value (estimation of Q), but we don't know the exact TD target, we estimate it with Bellman's equation. However the problem is that we are using the same parameters (weights) for estimating the TD target and the Q-value.
+
+<p align="center">
+  <img src="./img/deep_q_loss.jpg" alt="td", width="600"/>
+</p>
+
+This makes us chase a moving target, which may cause significant oscilations in the training (with regard to the parameters).
+
+Instead we:
+- use a separeate network with fixed parameters for estimating the TD target
+- copy the parameters from out Deep Q-network every C steps to update the target network
+
+<p align="center">
+  <img src="./img/deep_q_fixed.jpg" alt="td", width="600"/>
+</p>
+
+#### Double DQN
+Double Deep Q-learning neural network - DQNs - were introduced to handle the problem of the overestimation of Q-values.
+
+<p align="center">
+  <img src="./img/TD.jpg" alt="td", width="600"/>
+</p>
+
+How do we know that the best action for the next state is the action with the highest Q-value?
+
+The accuracy of Q-values depends on what action we tried and what neighboring states were explored. Consequently, we don't have the information of the best action at the beggining of the training, therefore taking the max Q-value (which is noisy) can lead to false positives. If non-optimal actions are regurarly given a higher Q value than the optimal best action the learning will be complicated.
+
+when we compute the Q-target we use two networks in order to decouple the action selection from the target Q-value generation:
+- we use DQN network to select the best action to take for the next state (the action with the highest Q-value)
+- we use our target network to calculate the target Q-value of taking the action at the nest state
+
+Therefore, Double DQN helps us reduce the overestimation of Q-values and, as a consequence, helps us train faster and with more stable learning.
 
 ## Code Overview
 ### Lunar Lander tutorial
