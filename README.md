@@ -411,7 +411,7 @@ when we compute the Q-target we use two networks in order to decouple the action
 Therefore, Double DQN helps us reduce the overestimation of Q-values and, as a consequence, helps us train faster and with more stable learning.
 
 ### Policy Gradient with Pytorch
-_"All goals can be described as teh maximization of the expected cumulative reward"_ e.g. In a soccer game we maximize the number of goals we score and minimize the number of goals scored by the opponent.
+_"All goals can be described as the maximization of the expected cumulative reward"_ e.g. In a soccer game we maximize the number of goals we score and minimize the number of goals scored by the opponent.
 
 Before we talked about two methods for finding the optimal policy $\pi^{*}$:
 - value-based methods
@@ -431,14 +431,14 @@ Policy-gradient methods are a subclass of policy-based methods, the optimization
 The difference between them is how we optimize the parameters $\theta$:
 
 - in policy-based methods we search directly for the optimal policy and optimize the $\theta$ indirectly
-- in policy-gradeint methods we search directly the optimal policy and optimize the params $\theta$ directly by maximizing the performance of the objective function $J(\theta)$
+- in policy-gradient methods we search directly the optimal policy and optimize the params $\theta$ directly by maximizing the performance of the objective function $J(\theta)$
 
 #### Advanteges and disadvantages
 - Advantages:
   - simplicity of integration - we can estimate the policy directly without storing aditional data
   - we can use stochastic policy, this has 2 consequences:
   1. We don't need to implement exploration/exploitation trade-off by hand, since we output a probability distribution over actions.
-  2. We get rid of the problem of perceprual aliasing (when two states seem the same but need different actions)
+  2. We get rid of the problem of perceptual aliasing (when two states seem the same but need different actions)
 
 Policy-gradient methods are more efective in high-dimentional action spaces and continuous action spaces - Deep Q-learning may have a problem because it assigns a score for each possible action, but the action space may be infinite. In policy-gradient methods we output the probability over actions.
 
@@ -450,9 +450,9 @@ Policy-gradient methods are more efective in high-dimentional action spaces and 
   - can have high variance
 
 #### The big picture
-The probability of taking an action os called action preference. Our goal is to control that probability distribution.
+The probability of taking an action is called action preference. Our goal is to control that probability distribution.
 
-We optimizer the weights by letting the agent interact during an episode and if we win the episode we consider that each action taken was good and must be sampled more often, we want to increase $P(a|s)$ for each state pair (or decrease if we lost).
+We optimize the weights by letting the agent interact during an episode and if we win the episode we consider that each action taken was good and must be sampled more often, we want to increase $P(a|s)$ for each state pair (or decrease if we lost).
 
 ![](./img/pg_bigpicture.jpg)
 
