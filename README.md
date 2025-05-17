@@ -34,7 +34,7 @@ RL process in papers is called Markov Decision Process (MDP). Markov property im
 Episodic | Continuing
 
 ### Episodic
-We have a starting point and an ending point (terminal space). This creates an episode: a list of states, actions, rewards and sew states e.g. you start somewhere and end when you are killed or reach the end.
+We have a starting point and an ending point (terminal space). This creates an episode: a list of states, actions, rewards and new states e.g. you start somewhere and end when you are killed or reach the end.
 
 ### Continuing
 There is no terminal space. We must learn how to choose the best actions and simultaneously interact with the environment.
@@ -410,10 +410,94 @@ when we compute the Q-target we use two networks in order to decouple the action
 
 Therefore, Double DQN helps us reduce the overestimation of Q-values and, as a consequence, helps us train faster and with more stable learning.
 
+### Policy Gradient with Pytorch
+_"All goals can be described as teh maximization of the expected cumulative reward"_ e.g. In a soccer game we maximize the number of goals we score and minimize the number of goals scored by the opponent.
+
+Before we talked about two methods for finding the optimal policy $\pi^{*}$:
+- value-based methods
+  - optimal value $\rightarrow$ optimal policy
+  - we minimize the loss between the predicted and target value to approximate the true action value
+  - we have some sort of policy e.g. epsilon-greedy
+- policy-based methods
+  - we parametrize a policy with e.g. a NN $\pi_{\theta}$
+  - our objective is to maximize the performance of the policy
+![](./img/policy_based.png)
+
+With policy-based methods we can directly optimize our policy $\pi_{\theta}$ to output a probability distribution over the actions that lead to the best cumulative reward. To do this we define an objective function $J(\theta)$ that is the expected cumulative reward and we want to find the value $\theta$ that maximizes this objective.
+
+#### Policy-based vs policy-gradient based
+Policy-gradient methods are a subclass of policy-based methods, the optimization is (most of the time) on-policy, we only use data collected by our most recent version of $\pi_{\theta}$
+
+The difference between them is how we optimize the parameters $\theta$:
+
+- in policy-based methods we search directly for the optimal policy and optimize the $\theta$ indirectly
+- in policy-gradeint methods we search directly the optimal policy and optimize the params $\theta$ directly by maximizing the performance of the objective function $J(\theta)$
+
+#### Advanteges and disadvantages
+- Advantages:
+  - simplicity of integration - we can estimate the policy directly without storing aditional data
+  - we can use stochastic policy, this has 2 consequences:
+  1. We don't need to implement exploration/exploitation trade-off by hand, since we output a probability distribution over actions.
+  2. We get rid of the problem of perceprual aliasing (when two states seem the same but need different actions)
+
+Policy-gradient methods are more efective in high-dimentional action spaces and continuous action spaces - Deep Q-learning may have a problem because it assigns a score for each possible action, but the action space may be infinite. In policy-gradient methods we output the probability over actions.
+
+  - better convergence properties - instead of argmax of a value that may change rapidly we have a probability over actions, which is more stable in time
+
+- Disadvantages:
+  - policy-gradient methods may converge to local maxima instead of a global optimum
+  - it is slower
+  - can have high variance
+
+#### The big picture
+The probability of taking an action os called action preference. Our goal is to control that probability distribution.
+
+We optimizer the weights by letting the agent interact during an episode and if we win the episode we consider that each action taken was good and must be sampled more often, we want to increase $P(a|s)$ for each state pair (or decrease if we lost).
+
+![](./img/pg_bigpicture.jpg)
+
+Our policy $\pi$ has params $\theta$. The $\pi$ given a state outputs a probability distribution of actions:
+
+$\pi_{\theta} = P[A|s;\theta]$
+
+To know if our policy is good we define an objective funciton $J(\theta)$ that gives us the performance of the agent given a trajectory and outputs the expected cumulative reward
+
+![](./img/objective.jpg)
+
+This is the weighted average (given by P) of all the possible values that the return can take
+
+![](./img/expected_reward.png)
+
+![](./img/probability.png)
+
+#### Gradient ascent and the policy-gradient theorem
+We want to find a $\theta$ that maximizes $J(\theta)$, so we use gradient ascent (inverse of gradient descent):
+
+$\theta \leftarrow \theta + \alpha \cdot \nabla_{theta}J(\theta)$
+
+Problems with computing the derivative of $J(\theta)$:
+- we cannot calculate the true gradient of the objective function as it is intractable (all trajectory space), so we calculate a gradient estimation witha sample (we collect some trajectories)
+- to differentiate we need to differentiate the state distribution, called the Markov Decision Process dynamics, it gives us the probability of the environment going into the next state, given the current state. But we might not know about it, so we can't differentiate over it
+
+We are going to use a solution called _Policy Gradient Theorem_ that will help us to reformulate the objective function into a differentiable function that does not involve the differentiation of the state distribution.
+
+![](./img//policy_gradient_theorem.png)
+
+#### The reinforce algorithm (MC reinforce)
+The reinforce algo is the policy-gradient algo that uses an estimated return from the episode to update the policy
+
+1. Use the policy $\pi_{\theta}$ to collect an episode $\tau$
+2. Use the episode to estimate the gradient $\hat{g}=\nabla_{theta}J(\theta)$
+![](./img/policy_gradient_one.png)
+or
+![](./img/policy_gradient_multiple.png)
+3. update the weights $\theta \leftarrow \theta + \alpha \cdot \hat{g}$
+4. Repeat
+
 ## Code Overview
 ### Lunar Lander tutorial
 Gymnasium contains training environments and can be used as:
-```
+```python
 import gymnasium as gym
 
 # First, we create our environment called LunarLander-v2
@@ -440,7 +524,7 @@ for _ in range(20):
 env.close()
 ```
 Example env info and action
-```
+```python
 # We create our environment with gym.make("<name_of_the_environment>")
 env = gym.make("LunarLander-v3")
 env.reset()
@@ -468,11 +552,11 @@ print("Sample observation", env.observation_space.sample())  # Get an observatio
 # Action 3: Fire right orientation engine.
 ```
 Stack environments
-```
+```python
 env = make_vec_env("LunarLander-v2", n_envs=16)
 ```
 Train a model
-```
+```python
 # Create environment
 env = gym.make('LunarLander-v3')
 
@@ -495,7 +579,7 @@ model_name = "ppo-LunarLander-v3"
 model.save(model_name)
 ```
 Evaluate a model
-```
+```python
 from stable_baselines3.common.monitor import Monitor
 
 #we need to wrap the env in a monitor
@@ -504,7 +588,7 @@ mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=10, d
 print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 ```
 Push model to HuggingFace Hub
-```
+```python
 import gymnasium as gym
 
 from stable_baselines3 import PPO
@@ -537,7 +621,7 @@ package_to_hub(
 )
 ```
 Load from HuggingFace Hub
-```
+```python
 from huggingface_sb3 import load_from_hub
 
 repo_id = "Classroom-workshop/assignment2-omar"  # The repo_id
@@ -572,19 +656,19 @@ print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 
 #### Code
 ##### Trick to use virtual screen in google colab
-```
+```python
 import os
 
 os.kill(os.getpid(), 9)
 ```
-```
+```python
 from pyvirtualdisplay import Display
 
 virtual_display = Display(visible=0, size=(1400, 900))
 virtual_display.start()
 ```
 ##### Frozen lake
-```
+```python
 import numpy as np
 import gymnasium as gym
 import random
@@ -595,19 +679,19 @@ import tqdm
 import pickle5 as pickle
 from tqdm.notebook import tqdm
 ```
-```
+```python
 # map_name = "4x4" | "8x8"
 # is_slippery = define is we want the lake to be slipprey (agent to have momentum)
 
 env = gym.make("FrozenLake-v1", map_name="4x4", is_slippery=False, render_mode="rgb_array")
 ```
 Creating a custom grid
-```
+```python
 desc=["SFFF", "FHFH", "FFFH", "HFFG"]
 gym.make('FrozenLake-v1', desc=desc, is_slippery=True)
 ```
 Observation space
-```
+```python
 print("_____OBSERVATION SPACE_____ \n")
 print("Observation Space", env.observation_space)
 print("Sample observation", env.observation_space.sample())  # Get a random observation
@@ -621,7 +705,7 @@ print("Sample observation", env.observation_space.sample())  # Get a random obse
 E.g. the goal position is 3*4+3=15 (cur_row_index + n_cols + cur_col_index)
 
 Action space
-```
+```python
 print("\n _____ACTION SPACE_____ \n")
 print("Action Space Shape", env.action_space.n)
 print("Action Space Sample", env.action_space.sample())  # Take a random action
@@ -633,7 +717,7 @@ print("Action Space Sample", env.action_space.sample())  # Take a random action
 ```
 ###### Step 1
 Initialize Q-table
-```
+```python
 state_space = env.observation_space.n
 print("There are ", state_space, " possible states")
 
@@ -647,13 +731,13 @@ def initialize_q_table(state_size, action_size):
 qtab_frozen_lake = initialize_q_table(state_space, action_space)
 ```
 Define (off-policy policy)
-```
+```python
 def greedy(qtab, state):
   action = np.argmax(qtab[state])
   return action
 ```
 Define policy
-```
+```python
 def epsilon_policy(qtab, state, epsi):
 
   rand_num = np.random.uniform(0,1)
@@ -665,7 +749,7 @@ def epsilon_policy(qtab, state, epsi):
   return action
 ```
 Define hyperparams
-```
+```python
 n_epochs = 1e5
 lr = 0.5
 
@@ -680,7 +764,7 @@ min_epsilon = 0.05
 epsi_decay = 5e-4
 ```
 Training loop - pseudocode
-```
+```python
 For epoch in total n epochs:
 
   reduce epsi
@@ -694,7 +778,7 @@ For epoch in total n epochs:
     next state = new state
 ```
 Train function
-```
+```python
 def train(n_epoch, min_epsi, max_epsi, decay_rate, env, max_steps, qtable):
   for episode in tqdm(range(n_epoch)):
     epsi = min_epsi + (max_epsi - min_epsi)*np.exp(-decay_rate*episode)
@@ -718,11 +802,11 @@ def train(n_epoch, min_epsi, max_epsi, decay_rate, env, max_steps, qtable):
   
   return qtable
 ```
-```
+```python
 qtab_frozen_lake = train(n_epochs, min_epsilon, max_epsilon, epsi_decay, env, max_steps, qtab_frozen_lake)
 ```
 Evaluate agent
-```
+```python
 def eval(env, max_steps, n_eval_epochs, q, seed):
   episode_rewards=[]
   for episode in tqdm(range(n_eval_epochs)):
@@ -753,12 +837,12 @@ def eval(env, max_steps, n_eval_epochs, q, seed):
 
   return mean_reward, std_reward
 ```
-```
+```python
 mean_reward, std_reward = evaluate_agent(env, max_steps, n_eval_epochs, qtab_frozen_lake, eval_seed)
 print(f"Mean_reward={mean_reward:.2f} +/- {std_reward:.2f}")
 ```
 Push model to HF hub
-```
+```python
 from huggingface_hub import HfApi, snapshot_download
 from huggingface_hub.repocard import metadata_eval_result, metadata_save
 
@@ -914,7 +998,7 @@ def push_to_hub(repo_id, model, env, video_fps=1, local_repo_path="hub"):
 
     print("Your model is pushed to the Hub. You can view your model here: ", repo_url)
 ```
-```
+```python
 model = {
     "env_id": env_id,
     "max_steps": max_steps,
@@ -929,7 +1013,7 @@ model = {
     "qtable": Qtable_frozenlake,
 }
 ```
-```
+```python
 username = #USER_123
 repo_name = #frozenlake_best_model
 push_to_hub(repo_id=f"{username}/{repo_name}", model=model, env=env)
@@ -937,13 +1021,13 @@ push_to_hub(repo_id=f"{username}/{repo_name}", model=model, env=env)
 
 ##### Taxi-v3
 Initialize Q-table
-```
+```python
 Qtable_taxi = initialize_q_table(state_space, action_space)
 print(Qtable_taxi)
 print("Q-table shape: ", Qtable_taxi.shape)
 ```
 Define hyperparameters
-```
+```python
 n_training_episodes = 25000
 learning_rate = 0.7
 
@@ -969,11 +1053,11 @@ min_epsilon = 0.05
 decay_rate = 0.005
 ```
 Train
-```
+```python
 Qtable_taxi = train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, Qtable_taxi)
 ```
 Push to HF hub
-```
+```python
 model = {
     "env_id": env_id,
     "max_steps": max_steps,
@@ -988,13 +1072,13 @@ model = {
     "qtable": Qtable_taxi,
 }
 ```
-```
+```python
 username = #USER_123
 repo_name = #frozenlake_best_model
 push_to_hub(repo_id=f"{username}/{repo_name}", model=model, env=env)
 ```
 Load from HF hub
-```
+```python
 from urllib.error import HTTPError
 
 from huggingface_hub import hf_hub_download
@@ -1014,7 +1098,7 @@ def load_from_hub(repo_id: str, filename: str) -> str:
 
     return downloaded_model_file
 ```
-```
+```python
 model = load_from_hub(repo_id="ThomasSimonini/q-Taxi-v3", filename="q-learning.pkl")  # Try to use another model
 
 print(model)
@@ -1022,7 +1106,7 @@ env = gym.make(model["env_id"])
 
 evaluate_agent(env, model["max_steps"], model["n_eval_episodes"], model["qtable"], model["eval_seed"])
 ```
-```
+```python
 model = load_from_hub(
     repo_id="ThomasSimonini/q-FrozenLake-v1-no-slippery", filename="q-learning.pkl"
 )  # Try to use another model
