@@ -494,6 +494,10 @@ or
 3. update the weights $\theta \leftarrow \theta + \alpha \cdot \hat{g}$
 4. Repeat
 
+#### Reinforce
+Also called the MC policy gradient is the policy-based method that is made in Pytorch to optimize the policy directly without the action-state function.
+![](./img/pg_pseudocode.png)
+
 ## Code Overview
 ### Lunar Lander tutorial
 Gymnasium contains training environments and can be used as:
